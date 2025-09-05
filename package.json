@@ -28,7 +28,7 @@
   },
   "license": "MIT",
   "engines": {
-    "node": "~20.4"
+    "node": "~20.5"
   },
   "lint-staged": {
     "*.ts": [

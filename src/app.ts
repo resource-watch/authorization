@@ -105,13 +105,13 @@ const init: () => Promise<IInit> = async (): Promise<IInit> => {
 
             app.use(RWAPIMicroservice.bootstrap({
                 logger,
-                gatewayURL: process.env.GATEWAY_URL,
-                microserviceToken: process.env.MICROSERVICE_TOKEN,
-                fastlyEnabled: process.env.FASTLY_ENABLED as boolean | 'true' | 'false',
+                gatewayURL: process.env.GATEWAY_URL || "http://localhost",
+                microserviceToken: process.env.MICROSERVICE_TOKEN || "XXXX",
+                fastlyEnabled: process.env.FASTLY_ENABLED as boolean | 'true' | 'false' || false,
                 fastlyServiceId: process.env.FASTLY_SERVICEID,
                 fastlyAPIKey: process.env.FASTLY_APIKEY,
                 requireAPIKey: process.env.REQUIRE_API_KEY as boolean | 'true' | 'false' || true,
-                awsRegion: process.env.AWS_REGION,
+                awsRegion: process.env.AWS_REGION || "us-east-1",
                 awsCloudWatchLogStreamName: config.get('service.name'),
                 awsCloudWatchLoggingEnabled: process.env.AWS_CLOUD_WATCH_LOGGING_ENABLED as boolean | 'true' | 'false' || true,
                 skipAPIKeyRequirementEndpoints: [
@@ -141,6 +141,8 @@ const init: () => Promise<IInit> = async (): Promise<IInit> => {
                     { method: 'GET', pathRegex: '^/auth/generate-token$' },
                     { method: 'GET', pathRegex: '^/auth/authorization-code/callback$' },
                     { method: 'GET', pathRegex: '^/auth/sign-up-redirect$' },
+                    //{ method: 'GET', pathRegex: '^/auth/user$' },
+                    //{ method: 'GET', pathRegex: '^/auth/user/me$' },
                     { method: 'GET', pathRegex: '^/api/v1/application$' },
                     { method: 'GET', pathRegex: '^/api/v1/application/(.*)$' },
                     { method: 'POST', pathRegex: '^/api/v1/application$' },
@@ -164,8 +166,8 @@ const init: () => Promise<IInit> = async (): Promise<IInit> => {
             resolve({ app, server });
 
         }).catch((mongoConnectionError: CallbackError) => {
-            logger.error('MongoURI', mongoUri);
-            logger.error(mongoConnectionError);
+            logger.error('MongoURI:', mongoUri);
+            logger.error('Mongo Connection Error:', mongoConnectionError);
             reject(new Error(mongoConnectionError.message));
         });
     });

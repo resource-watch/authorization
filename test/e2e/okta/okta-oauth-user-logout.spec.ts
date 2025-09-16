@@ -76,6 +76,30 @@ describe('[OKTA] GET logout current user session', () => {
         response.status.should.equal(200);
     });
 
+    it('Logging out with callbackUrl should redirect', async () => {
+
+        nock('https://www.wikipedia.org')
+            .get('/')
+            .reply(200, 'ok');
+
+        const user: OktaUser = getMockOktaUser();
+        const token: string = mockValidJWT({
+            id: user.profile.legacyId,
+            email: user.profile.email,
+            role: user.profile.role,
+            extraUserData: { apps: user.profile.apps },
+        });
+        mockOktaListUsers({ limit: 1, search: `(profile.legacyId eq "${user.profile.legacyId}")` }, [user]);
+        mockOktaLogoutUser(user.id);
+
+        const response: request.Response = await requester
+          .get(`/auth/logout?callbackUrl=https://www.wikipedia.org/`)
+          .set('Authorization', `Bearer ${token}`);
+
+        response.should.redirect;
+        response.should.redirectTo('https://www.wikipedia.org/');
+    });
+
     after(async () => {
         await closeTestAgent();
     });

@@ -58,8 +58,14 @@
                         <img src="<%= generalConfig.application.logo %>" >
                     </div >
                     <div class="small-10 medium-8 large-6 columns align-center" >
-                        <h1 >Login correct</h1 >
-                        <h4 >Welcome to the RW API</h4 >
+                        <h1 >Login correct!</h1 >
+                        <h4 >
+                          <% if (generalConfig.application.appUrl) { %>
+                            <a href="<%= generalConfig.application.appUrl %>">Return to <%= generalConfig.application.name %>.</a>
+                          <% } else { %>
+                            Welcome to the RW API!
+                          <% } %>
+                        </h4 >
                     </div >
 
                 </div >

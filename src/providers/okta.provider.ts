@@ -700,7 +700,7 @@ export class OktaProvider {
         }
         await OktaService.logoutUser(user);
 
-        ctx.logout();
+        await ctx.logout();
         ctx.redirect('/auth/login');
     }
 

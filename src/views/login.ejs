@@ -30,7 +30,7 @@
 
         .login-form {
             background: white;
-            padding: 50px 20px;
+            padding: 50px 20px 0px 20px;
             box-shadow: 2px 2px 20px rgba(0, 0, 0, .1);
         }
 
@@ -50,6 +50,18 @@
           margin: auto;
           margin-bottom: 20px;
           display: block;
+        }
+
+        .tos {
+          margin: 20px auto;
+          display: block;
+          font-size: 10pt;
+          text-align: center;
+        }
+
+        .extra-text {
+          margin: 10px auto;
+          font-size: 11pt;
         }
     </style>
 </head>
@@ -72,6 +84,7 @@
                                 </button>
                             </div>
                         <% } %>
+                        <div class="extra-text"><%= generalConfig.application.extraText %></div>
                         <form action="/auth/login" method="POST">
                             <label for="email">
                                 <input type="email" name="email" placeholder="Email" required>
@@ -81,7 +94,7 @@
                             </label>
                             <button class="button" type="submit">Login</button> or
                             <a class="register" href="/auth/sign-up">Register</a>
-                            <a class="recover" href="/auth/reset-password">Recover password</a>
+                            <a class="recover" href="/auth/reset-password">Forgot password?</a>
                         </form>
                         <% if (thirdParty.twitter || thirdParty.google || thirdParty.facebook || thirdParty.apple) { %>
                             <div class="third-party">
@@ -102,7 +115,9 @@
                             </div>
                         <% } %>
                     </div>
-
+                    <div class="tos">
+                      By logging in, you agree to WRI's <a target="_blank" href="https://www.wri.org/about/legal/general-terms-use">Terms of Use</a> and <a target="_blank" href="https://www.wri.org/about/privacy-policy">Privacy Policy</a>.
+                    </div>
                 </div>
             </div>
         </div>

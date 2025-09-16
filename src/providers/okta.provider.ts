@@ -698,10 +698,19 @@ export class OktaProvider {
         if (!user) {
             return ctx.throw(401, 'Not logged');
         }
-        await OktaService.logoutUser(user);
 
+        let redirect_uri: string = '/auth/login';
+
+        if (ctx.session.callbackUrl) {
+          logger.info('[OktaProvider] - Url redirect', ctx.session.callbackUrl);
+
+          redirect_uri = ctx.session.callbackUrl;
+        }
+
+        await OktaService.logoutUser(user);
         await ctx.logout();
-        ctx.redirect('/auth/login');
+
+        ctx.redirect(redirect_uri.toString());
     }
 
     static async signUp(ctx: Context): Promise<void> {

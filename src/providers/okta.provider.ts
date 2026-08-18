@@ -18,7 +18,6 @@ import {
 } from 'services/okta.interfaces';
 import UserNotFoundError from 'errors/userNotFound.error';
 import config from 'config';
-import { sleep } from 'sleep';
 import PasswordRecoveryNotAllowedError from 'errors/passwordRecoveryNotAllowed.error';
 import { DELETION_STATUS_DONE, DELETION_STATUS_PENDING, IDeletion } from 'models/deletion';
 import DeletionService from 'services/deletion.service';
@@ -31,6 +30,11 @@ import OrganizationUserModel, { IOrganizationUser, ORGANIZATION_ROLES, Role } fr
 import { IOrganization, IOrganizationId } from "models/organization";
 import ApplicationService from "services/application.service";
 import OrganizationService from "services/organization.service";
+
+
+const sleep = (ms: number): Promise<void> =>
+    new Promise<void>((resolve: () => void) => setTimeout(resolve, ms));
+
 
 export class OktaProvider {
 
@@ -898,7 +902,7 @@ export class OktaProvider {
                  * For some reason (I assume an index delay on Okta's side) that search may come up empty if it's done straight
                  * away, so I'm giving 2 seconds (picked randomly) to Okta, so it can index that data and properly serve it.
                  */
-                sleep(2);
+                await sleep(2000);
                 let user: IUser = Utils.getUser(ctx);
                 if (user.role === 'USER') {
                     user = await OktaService.updateApplicationsForUser(user.id, ctx.session.applications);

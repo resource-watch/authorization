@@ -270,8 +270,14 @@ export default class OktaService {
         logger.info('[OktaService] Searching user with id ', id, newApps);
         let oktaUser: OktaUser = await OktaService.getOktaUserById(id);
 
-        if (difference(newApps, oktaUser.profile.apps).length !== 0) {
-            oktaUser = await OktaService.updateUserProtectedFields(oktaUser.id, { apps: newApps });
+        // apps is an additive access grant: logging into a second app must add to the
+        // user's existing apps, never replace them. Merge rather than overwrite so a
+        // user's access to previously-used products is never revoked as a side effect
+        // of logging into an unrelated product.
+        const mergedApps: string[] = [...new Set([...(oktaUser.profile.apps ?? []), ...newApps])];
+
+        if (difference(mergedApps, oktaUser.profile.apps ?? []).length !== 0) {
+            oktaUser = await OktaService.updateUserProtectedFields(oktaUser.id, { apps: mergedApps });
         }
 
         return OktaService.convertOktaUserToIUser(oktaUser);

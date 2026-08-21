@@ -219,10 +219,16 @@ export default class OktaService {
                 isRevoked = true;
             }
 
-            const tokenApps: string[] = payload.extraUserData?.apps?.sort();
-            const userApps: string[] = user.profile.apps?.sort();
-            if (!isEqual(tokenApps, userApps)) {
-                logger.info(`[OktaService] "apps" in token ("${tokenApps}") does not match value obtained from Okta ("${userApps}")`);
+            const tokenApps: string[] = payload.extraUserData?.apps ?? [];
+            const userApps: string[] = user.profile.apps ?? [];
+
+            // Only revoke if the profile has REMOVED an app the token claims to still have.
+            // Gaining additional apps after token issuance must never revoke - apps is an
+            // additive grant, not an identity fingerprint (unlike id/role/email, which are
+            // correctly checked with strict equality above).
+            const lostApps: string[] = tokenApps.filter((app: string) => !userApps.includes(app));
+            if (lostApps.length > 0) {
+                logger.info(`[OktaService] Token claims app(s) ${lostApps} no longer present on user's Okta profile`);
                 isRevoked = true;
             }
 

@@ -219,6 +219,37 @@ describe('[OKTA] Authorization code callback endpoint tests', () => {
         await validateTokenRequestAndaPayload({ ...user, profile: { ...user.profile, apps: ['rw', 'gfw' ]} });
     });
 
+    it('Logging into a second app should merge into the user\'s existing app grants rather than overwriting them', async () => {
+        // Regression test for a bug where updateApplicationsForUser replaced the user's
+        // existing `apps` grants with only the app(s) from the current login, silently
+        // dropping any apps the user was previously granted access to (e.g. a user with
+        // apps: ['rw'] logging into GFW, which sends applications=gfw on every login,
+        // would have their `rw` access wiped out as a side effect).
+        //
+        // Here the user already has apps: ['rw'] (the getMockOktaUser default) and logs
+        // into a second app that only requests `gfw` (not the union `rw,gfw`), so the
+        // resulting apps must be the union of both, not just the newly requested app.
+        const tokenResponse: OktaSuccessfulOAuthTokenResponse = mockOktaOAuthToken();
+        const tokenData: OktaOAuthTokenPayload = JWT.decode(tokenResponse.access_token) as OktaOAuthTokenPayload;
+        const user: OktaUser = getMockOktaUser();
+        mockGetUserByOktaId(tokenData.uid, user);
+
+        // Requests for updating user applications
+        mockGetUserById(user);
+        mockOktaUpdateUser(user, { apps: ['rw', 'gfw'] });
+
+        await requester.get(`/auth?applications=gfw`);
+
+        const responseOne: request.Response = await requester
+            .get(`/auth/authorization-code/callback?code=TEST_FACEBOOK_OAUTH2_CALLBACK_CODE`)
+            .redirects(0);
+
+        responseOne.should.redirect;
+        responseOne.should.redirectTo(new RegExp(`/auth/success$`));
+
+        await validateTokenRequestAndaPayload({ ...user, profile: { ...user.profile, apps: ['rw', 'gfw'] } });
+    });
+
     it('OAuth login with user that matches an existing fake account updates the user with the fake account data, redirecting to the login successful page', async () => {
         const tokenResponse: OktaSuccessfulOAuthTokenResponse = mockOktaOAuthToken();
         const tokenData: OktaOAuthTokenPayload = JWT.decode(tokenResponse.access_token) as OktaOAuthTokenPayload;

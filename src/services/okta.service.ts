@@ -219,10 +219,16 @@ export default class OktaService {
                 isRevoked = true;
             }
 
-            const tokenApps: string[] = payload.extraUserData?.apps?.sort();
-            const userApps: string[] = user.profile.apps?.sort();
-            if (!isEqual(tokenApps, userApps)) {
-                logger.info(`[OktaService] "apps" in token ("${tokenApps}") does not match value obtained from Okta ("${userApps}")`);
+            const tokenApps: string[] = payload.extraUserData?.apps ?? [];
+            const userApps: string[] = user.profile.apps ?? [];
+
+            // Only revoke if the profile has REMOVED an app the token claims to still have.
+            // Gaining additional apps after token issuance must never revoke - apps is an
+            // additive grant, not an identity fingerprint (unlike id/role/email, which are
+            // correctly checked with strict equality above).
+            const lostApps: string[] = tokenApps.filter((app: string) => !userApps.includes(app));
+            if (lostApps.length > 0) {
+                logger.info(`[OktaService] Token claims app(s) ${lostApps} no longer present on user's Okta profile`);
                 isRevoked = true;
             }
 
@@ -270,8 +276,14 @@ export default class OktaService {
         logger.info('[OktaService] Searching user with id ', id, newApps);
         let oktaUser: OktaUser = await OktaService.getOktaUserById(id);
 
-        if (difference(newApps, oktaUser.profile.apps).length !== 0) {
-            oktaUser = await OktaService.updateUserProtectedFields(oktaUser.id, { apps: newApps });
+        // apps is an additive access grant: logging into a second app must add to the
+        // user's existing apps, never replace them. Merge rather than overwrite so a
+        // user's access to previously-used products is never revoked as a side effect
+        // of logging into an unrelated product.
+        const mergedApps: string[] = [...new Set([...(oktaUser.profile.apps ?? []), ...newApps])];
+
+        if (difference(mergedApps, oktaUser.profile.apps ?? []).length !== 0) {
+            oktaUser = await OktaService.updateUserProtectedFields(oktaUser.id, { apps: mergedApps });
         }
 
         return OktaService.convertOktaUserToIUser(oktaUser);

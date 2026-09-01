@@ -3,7 +3,7 @@ import chai from 'chai';
 import chaiDateTime from 'chai-datetime';
 import { getTestAgent } from '../utils/test-server';
 import request from 'superagent';
-import { getMockOktaUser, mockGetUserById, mockInvalidJWT, mockValidJWT } from '../okta/okta.mocks';
+import { getMockOktaUser, mockGetUserById, mockInvalidJWT, mockOktaGetUserByEmail, mockValidJWT } from '../okta/okta.mocks';
 import { describe } from "mocha";
 import { TOKENS } from "../utils/test.constants";
 import { OktaUser } from "services/okta.interfaces";
@@ -107,6 +107,81 @@ describe('Request validation tests', () => {
             response.body.errors[0].should.have.property('detail', '"potato" is not allowed');
         });
     })
+
+    describe('token revocation based on apps grant changes', () => {
+        it('Request validation with a userToken whose apps claim is a subset of the user\'s current apps should not be revoked', async () => {
+            // Regression test for a bug where checkRevokedToken used strict equality
+            // between the token's apps claim and the user's current Okta apps, so any
+            // difference - including apps gained after the token was issued - caused
+            // the token to be revoked. apps is an additive access grant: a user logging
+            // into a second app (e.g. a GNW token, apps: [], while the user has since
+            // logged into GFW and now has apps: ['gfw']) should not invalidate an
+            // otherwise-valid session for the first app.
+            const microserviceToken: string = TOKENS.MICROSERVICE;
+            const testUser: OktaUser = getMockOktaUser({ apps: ['gfw'] });
+            const token: string = mockValidJWT({
+                id: testUser.profile.legacyId,
+                email: testUser.profile.email,
+                role: testUser.profile.role,
+                extraUserData: { apps: [] },
+            }, false);
+
+            // The live Okta profile has since gained "gfw" that the token doesn't know about.
+            mockOktaGetUserByEmail({
+                legacyId: testUser.profile.legacyId,
+                email: testUser.profile.email,
+                role: testUser.profile.role,
+                apps: testUser.profile.apps,
+            });
+            mockGetUserById(testUser);
+
+            const response: request.Response = await requester
+                .post(`/api/v1/request/validate`)
+                .set('Authorization', `Bearer ${microserviceToken}`)
+                .send({
+                    userToken: token
+                });
+
+            response.status.should.equal(200);
+            response.body.should.have.property('user');
+            const responseUser = response.body.user.data;
+            responseUser.extraUserData.should.have.property('apps').and.be.an('array').and.deep.equal(testUser.profile.apps);
+        });
+
+        it('Request validation with a userToken claiming an app the user has since lost should still be revoked', async () => {
+            // Regression guard: this is the real-revocation case that must keep working.
+            // If the user's Okta profile has lost an app the token claims to still have,
+            // the token must still be revoked - only *gaining* apps should be tolerated.
+            const microserviceToken: string = TOKENS.MICROSERVICE;
+            const testUser: OktaUser = getMockOktaUser({ apps: [] });
+            const token: string = mockValidJWT({
+                id: testUser.profile.legacyId,
+                email: testUser.profile.email,
+                role: testUser.profile.role,
+                extraUserData: { apps: ['gfw'] },
+            }, false);
+
+            // The live Okta profile has since lost "gfw" that the token still claims to have.
+            mockOktaGetUserByEmail({
+                legacyId: testUser.profile.legacyId,
+                email: testUser.profile.email,
+                role: testUser.profile.role,
+                apps: testUser.profile.apps,
+            });
+
+            const response: request.Response = await requester
+                .post(`/api/v1/request/validate`)
+                .set('Authorization', `Bearer ${microserviceToken}`)
+                .send({
+                    userToken: token
+                });
+
+            response.status.should.equal(401);
+            response.body.should.have.property('errors').and.be.an('array').and.length(1);
+            response.body.errors[0].should.have.property('status', 401);
+            response.body.errors[0].should.have.property('detail', 'Token revoked');
+        });
+    });
 
     it('Request validation with a valid apiKey and no userToken should return a 200 (happy case)', async () => {
         const microserviceToken: string = TOKENS.MICROSERVICE
